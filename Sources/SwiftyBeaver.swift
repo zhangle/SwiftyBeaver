@@ -26,19 +26,23 @@ open class SwiftyBeaver {
         case fault = 6
     }
 
+	public init() {
+		
+	}
+	
     // a set of active destinations
-    public private(set) static var destinations = Set<BaseDestination>()
+    public private(set) var destinations = Set<BaseDestination>()
     
     /// A private queue for synchronizing access to `destinations`.
     /// Read accesses are done concurrently.
     /// Write accesses are done with a barrier, ensuring only 1 operation is ran at that time.
-    private static let queue = DispatchQueue(label: "destination queue", attributes: .concurrent)
+    private let queue = DispatchQueue(label: "destination queue", attributes: .concurrent)
 
     // MARK: Destination Handling
 
     /// returns boolean about success
     @discardableResult
-    open class func addDestination(_ destination: BaseDestination) -> Bool {
+    open func addDestination(_ destination: BaseDestination) -> Bool {
         return queue.sync(flags: DispatchWorkItemFlags.barrier) {
             if destinations.contains(destination) {
                 return false
@@ -50,7 +54,7 @@ open class SwiftyBeaver {
 
     /// returns boolean about success
     @discardableResult
-    open class func removeDestination(_ destination: BaseDestination) -> Bool {
+    open func removeDestination(_ destination: BaseDestination) -> Bool {
         return queue.sync(flags: DispatchWorkItemFlags.barrier) {
             if destinations.contains(destination) == false {
                 return false
@@ -61,14 +65,14 @@ open class SwiftyBeaver {
     }
 
     /// if you need to start fresh
-    open class func removeAllDestinations() {
+    open func removeAllDestinations() {
         queue.sync(flags: DispatchWorkItemFlags.barrier) {
             destinations.removeAll()
         }
     }
 
     /// returns the amount of destinations
-    open class func countDestinations() -> Int {
+    open func countDestinations() -> Int {
         return queue.sync { destinations.count }
     }
 
@@ -93,7 +97,7 @@ open class SwiftyBeaver {
     // MARK: Levels
 
     /// log something generally unimportant (lowest priority)
-    open class func verbose(_ message: @autoclosure () -> Any,
+    open func verbose(_ message: @autoclosure () -> Any,
         file: String = #file, function: String = #function, line: Int = #line, context: Any? = nil) {
         #if swift(>=5)
         custom(level: .verbose, message: message(), file: file, function: function, line: line, context: context)
@@ -103,7 +107,7 @@ open class SwiftyBeaver {
     }
 
     /// log something which help during debugging (low priority)
-    open class func debug(_ message: @autoclosure () -> Any,
+    open func debug(_ message: @autoclosure () -> Any,
         file: String = #file, function: String = #function, line: Int = #line, context: Any? = nil) {
         #if swift(>=5)
         custom(level: .debug, message: message(), file: file, function: function, line: line, context: context)
@@ -113,7 +117,7 @@ open class SwiftyBeaver {
     }
 
     /// log something which you are really interested but which is not an issue or error (normal priority)
-    open class func info(_ message: @autoclosure () -> Any,
+    open func info(_ message: @autoclosure () -> Any,
         file: String = #file, function: String = #function, line: Int = #line, context: Any? = nil) {
         #if swift(>=5)
         custom(level: .info, message: message(), file: file, function: function, line: line, context: context)
@@ -123,7 +127,7 @@ open class SwiftyBeaver {
     }
 
     /// log something which may cause big trouble soon (high priority)
-    open class func warning(_ message: @autoclosure () -> Any,
+    open func warning(_ message: @autoclosure () -> Any,
         file: String = #file, function: String = #function, line: Int = #line, context: Any? = nil) {
         #if swift(>=5)
         custom(level: .warning, message: message(), file: file, function: function, line: line, context: context)
@@ -133,7 +137,7 @@ open class SwiftyBeaver {
     }
 
     /// log something which will keep you awake at night (highest priority)
-    open class func error(_ message: @autoclosure () -> Any,
+    open func error(_ message: @autoclosure () -> Any,
         file: String = #file, function: String = #function, line: Int = #line, context: Any? = nil) {
         #if swift(>=5)
         custom(level: .error, message: message(), file: file, function: function, line: line, context: context)
@@ -143,7 +147,7 @@ open class SwiftyBeaver {
     }
     
     /// log something which will keep you awake at night (highest priority)
-    open class func critical(_ message: @autoclosure () -> Any,
+    open func critical(_ message: @autoclosure () -> Any,
                              file: String = #file, function: String = #function, line: Int = #line, context: Any? = nil) {
         #if swift(>=5)
         custom(level: .critical, message: message(), file: file, function: function, line: line, context: context)
@@ -153,7 +157,7 @@ open class SwiftyBeaver {
     }
     
     /// log something which will keep you awake at night (highest priority)
-    open class func fault(_ message: @autoclosure () -> Any,
+    open func fault(_ message: @autoclosure () -> Any,
                           file: String = #file, function: String = #function, line: Int = #line, context: Any? = nil) {
         #if swift(>=5)
         custom(level: .fault, message: message(), file: file, function: function, line: line, context: context)
@@ -163,10 +167,10 @@ open class SwiftyBeaver {
     }
 
     /// custom logging to manually adjust values, should just be used by other frameworks
-    open class func custom(level: SwiftyBeaver.Level, message: @autoclosure () -> Any,
+    open func custom(level: SwiftyBeaver.Level, message: @autoclosure () -> Any,
                              file: String = #file, function: String = #function, line: Int = #line, context: Any? = nil) {
         #if swift(>=5)
-        dispatch_send(level: level, message: message(), thread: threadName(),
+		dispatch_send(level: level, message: message(), thread: SwiftyBeaver.threadName(),
                       file: file, function: function, line: line, context: context)
         #else
         dispatch_send(level: level, message: message, thread: threadName(),
@@ -175,7 +179,7 @@ open class SwiftyBeaver {
     }
 
     /// internal helper which dispatches send to dedicated queue if minLevel is ok
-    class func dispatch_send(level: SwiftyBeaver.Level, message: @autoclosure () -> Any,
+    func dispatch_send(level: SwiftyBeaver.Level, message: @autoclosure () -> Any,
         thread: String, file: String, function: String, line: Int, context: Any?) {
         var resolvedMessage: String?
         let destinations = queue.sync { self.destinations }
@@ -189,7 +193,7 @@ open class SwiftyBeaver {
             if dest.shouldLevelBeLogged(level, path: file, function: function, message: resolvedMessage) {
                 // try to convert msg object to String and put it on queue
                 let msgStr = resolvedMessage == nil ? "\(message())" : resolvedMessage!
-                let f = stripParams(function: function)
+				let f = SwiftyBeaver.stripParams(function: function)
 
                 if dest.asynchronously {
                     queue.async {
@@ -207,7 +211,7 @@ open class SwiftyBeaver {
     /// flush all destinations to make sure all logging messages have been written out
     /// returns after all messages flushed or timeout seconds
     /// returns: true if all messages flushed, false if timeout or error occurred
-    public class func flush(secondTimeout: Int64) -> Bool {
+    public func flush(secondTimeout: Int64) -> Bool {
         let grp = DispatchGroup()
         let destinations = queue.sync { self.destinations }
         for dest in destinations {
